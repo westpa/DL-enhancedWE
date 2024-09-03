@@ -2,6 +2,8 @@
 Implementing binless WESTPA with DeepDriveMD. This repo uses the NTL9 synMD object (created by John Russo & Dan Zuckerman) as the subject and simulation engine for this example.
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.13387514.svg)](https://doi.org/10.5281/zenodo.13387514)
+[![bioRxiv](https://img.shields.io/badge/Pre--print-darkgreen)](https://doi.org/10.1101/2024.08.28.610178)
+
 
 ## Installation
 To run these example files, create an environment as follows:
