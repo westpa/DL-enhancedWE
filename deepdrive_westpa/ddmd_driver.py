@@ -52,7 +52,10 @@ def euclidean_cosine_distance(v1: np.ndarray, v2: np.ndarray) -> float:
     """
     similarity = np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2))
 
-    return np.sqrt(2 * (1 - similarity))
+    if np.isclose(1., similarity):
+        return 0
+    else:
+        return np.sqrt(2 * (1 - similarity))
 
 
 def find_combinations(num_resamples: int, num_segs: int) -> List[np.ndarray]:
