@@ -9,10 +9,10 @@ Implementing binless WESTPA with DeepDriveMD. This repo uses the NTL9 synMD obje
 To run these example files, create an environment as follows:
 
 ```bash
-conda create -n deepdrive-westpa -c conda-forge westpa MDAnalysis scikit-learn natsort nbformat
+conda create -n deepdrive-westpa -c conda-forge westpa MDAnalysis scikit-learn natsort nbformat faiss
 conda activate deepdrive-westpa 
 pip install git+https://github.com/jeremyleung521/SynD.git@rng-fix
-pip install git+https://github.com/jeremyleung521/mdlearn.git@pydantic-fix
+pip install git+https://github.com/ramanathanlab/mdlearn.git
 ```
 
 Finally, install pytorch based on the cuda libraies associated with your gpu; visit https://pytorch.org/ to find the correct command for you. Here's an example of a `pip` command:

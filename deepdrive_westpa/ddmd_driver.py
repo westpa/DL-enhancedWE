@@ -36,7 +36,103 @@ from westpa.core.we_driver import WEDriver
 from deepdrive_westpa.nani import KmeansNANI, compute_scores, extended_comparison
 from deepdrive_westpa.config import BaseSettings
 
+
+try:
+    import faiss
+except ModuleNotFoundError:
+    pass
+
 log = logging.getLogger(__name__)
+
+
+class FaissKNeighbors:
+    def __init__(self, k=5):
+        self.index = None
+        self.y = None
+        self.k = k
+
+    def fit(self, X, y=None):
+        #self.index = faiss.IndexFlatL2(X.shape[1])
+        #self.index.add(X.astype(np.float32))
+        self.index = faiss.IndexFlatIP(X.shape[1])  # cos dist
+        faiss.normalize_L2(X)
+        self.index.add(X.astype(np.float32, copy=False))
+        self.y = y
+        distance, indices = self.index.search(X.astype(np.float32, copy=False), k=self.k)
+        return distance, indices
+
+    def predict(self, X):
+        faiss.normalize_L2(X)
+        distances, indices = self.index.search(X.astype(np.float32), k=self.k)
+        votes = self.y[indices]
+        predictions = np.array([np.argmax(np.bincount(x)) for x in votes])
+        return predictions
+
+
+class FaissLOF(LocalOutlierFactor):
+    def fit(self, X, y=None):
+        """Fit the local outlier factor detector from the training dataset.
+
+        Parameters
+        ----------
+        X : {array-like, sparse matrix} of shape (n_samples, n_features) or \
+                (n_samples, n_samples) if metric='precomputed'
+            Training data.
+
+        y : Ignored
+            Not used, present for API consistency by convention.
+
+        Returns
+        -------
+        self : LocalOutlierFactor
+            The fitted local outlier factor detector.
+        """
+        self._fit(X)
+
+        n_samples = self.n_samples_fit_
+        if self.n_neighbors > n_samples:
+            warnings.warn(
+                "n_neighbors (%s) is greater than the "
+                "total number of samples (%s). n_neighbors "
+                "will be set to (n_samples - 1) for estimation."
+                % (self.n_neighbors, n_samples)
+            )
+        self.n_neighbors_ = max(1, min(self.n_neighbors, n_samples - 1))
+
+        #self._distances_fit_X_, _neighbors_indices_fit_X_ = self.kneighbors(
+        #    n_neighbors=self.n_neighbors_
+        #)
+
+        self._distances_fit_X_, _neighbors_indices_fit_X_ = FaissKNeighbors(
+            k=self.n_neighbors_
+        ).fit(X)
+
+        if self._fit_X.dtype == np.float32:
+            self._distances_fit_X_ = self._distances_fit_X_.astype(
+                self._fit_X.dtype,
+                copy=False,
+            )
+
+        self._lrd = self._local_reachability_density(
+            self._distances_fit_X_, _neighbors_indices_fit_X_
+        )
+
+        # Compute lof score over training samples to define offset_:
+        lrd_ratios_array = (
+            self._lrd[_neighbors_indices_fit_X_] / self._lrd[:, np.newaxis]
+        )
+
+        self.negative_outlier_factor_ = -np.mean(lrd_ratios_array, axis=1)
+
+        if self.contamination == "auto":
+            # inliers score around -1 (the higher, the less abnormal).
+            self.offset_ = -1.5
+        else:
+            self.offset_ = np.percentile(
+                self.negative_outlier_factor_, 100.0 * self.contamination
+            )
+
+        return self
 
 
 def euclidean_cosine_distance(v1: np.ndarray, v2: np.ndarray) -> float:
@@ -52,7 +148,7 @@ def euclidean_cosine_distance(v1: np.ndarray, v2: np.ndarray) -> float:
     """
     similarity = np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2))
 
-    if np.isclose(1., similarity):
+    if np.isclose(1, similarity):
         return 0
     else:
         return np.sqrt(2 * (1 - similarity))
@@ -920,6 +1016,8 @@ class ObjectiveSettings(BaseSettings):
     init_type: Optional[str] = "comp_sim"
     # Subset of data for Diversity selection. 20% * number of input structures needs to be >= the number of clusters you request (defaults to 10)
     percentage: Optional[int] = 10
+    # LOF function to use
+    lof_function: Optional[str] = 'scikit-learn'
 
     @classmethod
     def from_westpa_config(cls) -> "ObjectiveSettings":
@@ -975,8 +1073,14 @@ class Objective:
             "euclidean": "minkowski",
         }
 
+        lof_functions = {
+            "scikit-learn": self.lof_function_sklearn,
+            "faiss": self.lof_function_faiss,
+        }
+
         self.distance_function = dist_functions[self.cfg.distance_metric]
         self.distance_metric = dist_metric[self.cfg.distance_metric]
+        self.lof_function = lof_functions[self.cfg.lof_function]
 
     def save_latent_context(
         self,
@@ -1080,12 +1184,26 @@ class Objective:
             self.all_pcoords = pcoords
             self.all_weights = weight
 
-    def lof_function(self, all_z: np.ndarray) -> np.ndarray:
+    def lof_function_sklearn(self, all_z: np.ndarray, n_jobs: int) -> np.ndarray:
         # Time the LOF function
         start = time.time()
 
         # Run LOF on the full history of embeddings to assure coverage over past states
         clf = LocalOutlierFactor(
+            n_neighbors=self.cfg.lof_n_neighbors, metric=self.distance_metric, n_jobs=n_jobs
+        ).fit(all_z)
+
+        # Print the timing
+        print(f"LOF took {time.time() - start} seconds")
+
+        return clf.negative_outlier_factor_
+
+    def lof_function_faiss(self, all_z: np.ndarray) -> np.ndarray:
+        # Time the LOF function
+        start = time.time()
+
+        # Run LOF on the full history of embeddings to assure coverage over past states
+        clf = FaissLOF(
             n_neighbors=self.cfg.lof_n_neighbors, metric=self.distance_metric
         ).fit(all_z)
 
@@ -1093,6 +1211,7 @@ class Objective:
         print(f"LOF took {time.time() - start} seconds")
 
         return clf.negative_outlier_factor_
+       
 
     def kmeans_cluster_segments(self, all_z: np.ndarray) -> np.ndarray:
         # Perform the K-means clustering
@@ -1970,7 +2089,7 @@ class CustomDriver(DeepDriveMDDriver):
                 # Run LOF on the full history of embeddings to assure coverage over past states
                 all_outliers = self.objective.lof_function(all_z)
 
-                # Plot the latent space
+                    # Plot the latent space
                 if self.niter % self.cfg.plot_interval == 0:
                     self.plot_latent_space(
                         all_z,
