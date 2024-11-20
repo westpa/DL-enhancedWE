@@ -1184,7 +1184,7 @@ class Objective:
             self.all_pcoords = pcoords
             self.all_weights = weight
 
-    def lof_function_sklearn(self, all_z: np.ndarray, n_jobs: int) -> np.ndarray:
+    def lof_function_sklearn(self, all_z: np.ndarray, n_jobs: int=None) -> np.ndarray:
         # Time the LOF function
         start = time.time()
 
