@@ -778,7 +778,7 @@ class CVAESettings(BaseSettings):
     num_data_workers: int = 0
     prefetch_factor: Optional[int] = None
     batch_size: int = 64
-    device: str = "cuda"
+    device: str = "cpu"
     optimizer_name: str = "RMSprop"
     optimizer_hparams: Dict[str, Any] = {"lr": 0.001, "weight_decay": 0.00001}
     epochs: int = 100
@@ -786,6 +786,12 @@ class CVAESettings(BaseSettings):
     plot_log_every: int = 25
     plot_n_samples: int = 5000
     plot_method: Optional[str] = "raw"
+
+    @classmethod
+    def from_westpa_config(cls) -> "CVAESettings":
+        westpa_config = westpa.rc.config.get(['west', 'ddwe', 'cvae'], {})
+        return CVAESettings(**westpa_config)
+
 
 
 class MLSettings(BaseSettings):
@@ -820,6 +826,7 @@ class MachineLearningMethod:
             The path to a set of pre-exisiting training data to help the model properly converge.
         """
         self.cfg = MLSettings.from_westpa_config()
+        self.cvae_cfg = CVAESettings.from_westpa_config()
         self.niter = niter
         self.log_path = log_path
         if self.cfg.ml_mode == "train":
@@ -837,7 +844,7 @@ class MachineLearningMethod:
             self.train_path = None
 
         # Initialize the model
-        self.autoencoder = SymmetricConv2dVAETrainer(**CVAESettings().model_dump())
+        self.autoencoder = SymmetricConv2dVAETrainer(**self.cvae_cfg.model_dump())
 
     def get_target_point_coords(self, target_point_path: Path) -> np.ndarray:
         """
