@@ -1472,7 +1472,7 @@ class DDWESettings(BaseSettings):
     def from_westpa_config(cls) -> "DDWESettings":
         westpa_config = deepcopy(westpa.rc.config.get(["west", "ddwe"], {}))
         # Remove other dictionaries from westpa_config
-        for key in ["machine_learning", "objective"]:
+        for key in ["machine_learning", "objective", "cvae"]:
             westpa_config.pop(key, None)
 
         return DDWESettings(**westpa_config)

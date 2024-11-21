@@ -13,4 +13,4 @@ mkdir   seg_logs traj_segs istates
 w_init --bstate-file "bstates/bstates.txt" \
         --tstate-file "tstate.file" \
 	--segs-per-state 4 \
-	--work-manager=threads "$@" > init.log
+	--work-manager=threads "$@" |& tee init.log
