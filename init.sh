@@ -11,6 +11,6 @@ mkdir   seg_logs traj_segs istates
 # The tstate would be structures with RMSD < 1 Ang
 
 w_init --bstate-file "bstates/bstates.txt" \
-        --tstate-file "tstate.file" \
-	--segs-per-state 4 \
-	--work-manager=threads "$@" |& tee init.log
+       --tstate-file "tstate.file" \
+	   --segs-per-state 8 \
+       --work-manager=threads "$@" |& tee  init.log

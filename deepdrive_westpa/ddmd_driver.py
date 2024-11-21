@@ -471,7 +471,7 @@ class DeepDriveMDDriver(WEDriver, ABC):
         with data_manager.lock:
             for i in range(upperbound - iterations, upperbound):
                 iter_group = data_manager.get_iter_group(i)
-                coords_raw = iter_group["auxdata/dmatrix"][:]
+                coords_raw = iter_group["auxdata/dmatrix"][...]
                 for seg in coords_raw[:, 1:]:
                     back_coords.append(seg)
 
@@ -710,7 +710,23 @@ class DeepDriveMDDriver(WEDriver, ABC):
         # Sanity check
         self._check_pre()
 
-        # Resample
+        if self.do_target_density or self.do_target_nsegs:
+            # Calculating stats for later
+            _occupied_bins = np.fromiter(map(len, self.next_iter_binning), dtype=np.int_, count=self.bin_mapper.nbins)
+            self.system.expected_nsegs = np.sum(self.system.bin_target_counts[_occupied_bins != 0]).astype(int)
+
+            # Adjust bin target counts to account for sample density, especially useful for "Binless" protocols.
+            # or adjust bin target counts to maximize constant number of segments
+            try:
+                if self.do_target_density:
+                    self.rc.pstatus(f'{self.system.sample_density=}')
+                    self._adjust_bin_target_counts('density')
+                elif self.do_target_nsegs:
+                    self._adjust_bin_target_counts('nsegs')
+            except AttributeError:
+                # When dealing with older BinMappers and/or Drivers
+                self.rc.pstatus('Unable to adaptively adjust bin target counts.') # Resample
+
         for ibin, bin_ in enumerate(self.next_iter_binning):
             if len(bin_) == 0:
                 continue
@@ -722,7 +738,7 @@ class DeepDriveMDDriver(WEDriver, ABC):
                 self._adjust_count(ibin)
 
             # This checks for initializing; if niter is 0 then skip resampling
-            if self.niter:
+            elif self.niter:
                 # This is an attempt to sort all of the segments consistently
                 # If there is any recycling, we sort by the weight (less consistent)
                 # otherwise we are sorting by parent_id and seg_id (more consistent)
