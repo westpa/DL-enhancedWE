@@ -719,7 +719,8 @@ class DeepDriveMDDriver(WEDriver, ABC):
             # or adjust bin target counts to maximize constant number of segments
             try:
                 if self.do_target_density:
-                    self.rc.pstatus(f'{self.system.sample_density=}')
+                    self.rc.pstatus(f'Sample Volume: {self.system.bin_mapper.sample_volume}')
+                    self.rc.pstatus(f'Sample Density: {self.system.sample_density}')
                     self._adjust_bin_target_counts('density')
                 elif self.do_target_nsegs:
                     self._adjust_bin_target_counts('nsegs')
