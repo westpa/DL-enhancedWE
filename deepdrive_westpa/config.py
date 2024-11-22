@@ -3,8 +3,7 @@ from pathlib import Path
 from typing import Optional, Type, TypeVar, Union
 
 import yaml
-from pydantic_settings import BaseSettings as _BaseSettings
-from pydantic import validator
+from pydantic import validator, BaseModel as _BaseModel
 
 _T = TypeVar("_T")
 
@@ -38,7 +37,7 @@ def mkdir_validator(field: str) -> classmethod:
     return _validator
 
 
-class BaseSettings(_BaseSettings):
+class BaseModel(_BaseModel):
     """Base settings to provide an easier interface to read/write YAML files."""
 
     def dump_yaml(self, filename: PathLike) -> None:
