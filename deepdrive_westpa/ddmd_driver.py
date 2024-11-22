@@ -13,7 +13,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
-from natsort import natsorted
 from ast import literal_eval
 
 mpl.use("Agg")
@@ -697,7 +696,6 @@ class CVAESettings(BaseModel):
         return CVAESettings(**westpa_config)
 
 
-
 class MLSettings(BaseModel):
     # static, train
     ml_mode: Optional[str] = "train"
@@ -716,6 +714,11 @@ class MLSettings(BaseModel):
     def from_westpa_config(cls) -> "MLSettings":
         westpa_config = westpa.rc.config.get(["west", "ddwe", "machine_learning"], {})
         return MLSettings(**westpa_config)
+
+
+def sorted_key(input_path):
+    '''key to sort checkpoints, so we can remove natsort.natsorted as a dependency'''
+    return input_path.name.replace('.', '-').split('-')[-2].zfill(8)
 
 
 class MachineLearningMethod:
@@ -804,7 +807,7 @@ class MachineLearningMethod:
             return self.cfg.static_chk_path
         else:
             checkpoint_dir = self.save_path / "checkpoints"
-            model_weight_path = natsorted(list(checkpoint_dir.glob("*.pt")))[-1]
+            model_weight_path = sorted(list(checkpoint_dir.glob("*.pt")), key=sorted_key)[-1]
             return model_weight_path
 
     def train(self, coords: np.ndarray) -> None:
