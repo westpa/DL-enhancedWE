@@ -34,7 +34,7 @@ from westpa.core.segment import Segment
 from westpa.core.we_driver import WEDriver
 
 from deepdrive_westpa.nani import KmeansNANI, compute_scores, extended_comparison
-from deepdrive_westpa.config import BaseSettings
+from deepdrive_westpa.config import BaseModel
 
 log = logging.getLogger(__name__)
 
@@ -668,7 +668,7 @@ class DeepDriveMDDriver(WEDriver, ABC):
         log.debug("available initial states: {!r}".format(self.avail_initial_states))
 
 
-class CVAESettings(BaseSettings):
+class CVAESettings(BaseModel):
     """Settings for mdlearn SymmetricConv2dVAETrainer object."""
 
     input_shape: Tuple[int, int, int] = (1, 40, 40)
@@ -698,7 +698,7 @@ class CVAESettings(BaseSettings):
 
 
 
-class MLSettings(BaseSettings):
+class MLSettings(BaseModel):
     # static, train
     ml_mode: Optional[str] = "train"
     # Contact map distance cutoff
@@ -884,7 +884,7 @@ class MachineLearningMethod:
         return np.concatenate(target_point_rep)
 
 
-class ObjectiveSettings(BaseSettings):
+class ObjectiveSettings(BaseModel):
     # Objective method to use (lof, clustering).
     objective_method: str
     # Cluster resampling algorithm to use (simplified, complex).
@@ -927,6 +927,10 @@ class ObjectiveSettings(BaseSettings):
     init_type: Optional[str] = "comp_sim"
     # Subset of data for Diversity selection. 20% * number of input structures needs to be >= the number of clusters you request (defaults to 10)
     percentage: Optional[int] = 10
+    # LOF function to use
+    lof_function: Optional[str] = 'scikit-learn'
+    # Number of cores to use for scikit-learn
+    n_jobs: Optional[int] = None
 
     @classmethod
     def from_westpa_config(cls) -> "ObjectiveSettings":
@@ -1093,7 +1097,7 @@ class Objective:
 
         # Run LOF on the full history of embeddings to assure coverage over past states
         clf = LocalOutlierFactor(
-            n_neighbors=self.cfg.lof_n_neighbors, metric=self.distance_metric
+           n_neighbors=self.cfg.lof_n_neighbors, metric=self.distance_metric
         ).fit(all_z)
 
         # Print the timing
@@ -1323,7 +1327,7 @@ class Objective:
         return np.array(seg_labels)
 
 
-class DDWESettings(BaseSettings):
+class DDWESettings(BaseModel):
     # Output directory for the run.
     output_path: Path
     # Run machine learning; set to False for ablation.
@@ -1975,7 +1979,7 @@ class CustomDriver(DeepDriveMDDriver):
                 self.objective.save_latent_context(all_labels, all_outliers)
             else:
                 # Run LOF on the full history of embeddings to assure coverage over past states
-                all_outliers = self.objective.lof_function(all_z)
+                all_outliers = self.objective.lof_function(all_z, n_jobs=self.objective.cfg.n_jobs)
 
                 # Plot the latent space
                 if self.niter % self.cfg.plot_interval == 0:
