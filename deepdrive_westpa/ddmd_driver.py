@@ -34,7 +34,7 @@ from westpa.core.segment import Segment
 from westpa.core.we_driver import WEDriver
 
 from deepdrive_westpa.nani import KmeansNANI, compute_scores, extended_comparison
-from deepdrive_westpa.config import BaseSettings
+from deepdrive_westpa.config import BaseModel
 
 
 try:
@@ -98,10 +98,6 @@ class FaissLOF(LocalOutlierFactor):
                 % (self.n_neighbors, n_samples)
             )
         self.n_neighbors_ = max(1, min(self.n_neighbors, n_samples - 1))
-
-        #self._distances_fit_X_, _neighbors_indices_fit_X_ = self.kneighbors(
-        #    n_neighbors=self.n_neighbors_
-        #)
 
         self._distances_fit_X_, _neighbors_indices_fit_X_ = FaissKNeighbors(
             k=self.n_neighbors_
@@ -781,7 +777,7 @@ class DeepDriveMDDriver(WEDriver, ABC):
         log.debug("available initial states: {!r}".format(self.avail_initial_states))
 
 
-class CVAESettings(BaseSettings):
+class CVAESettings(BaseModel):
     """Settings for mdlearn SymmetricConv2dVAETrainer object."""
 
     input_shape: Tuple[int, int, int] = (1, 40, 40)
@@ -811,7 +807,7 @@ class CVAESettings(BaseSettings):
 
 
 
-class MLSettings(BaseSettings):
+class MLSettings(BaseModel):
     # static, train
     ml_mode: Optional[str] = "train"
     # Contact map distance cutoff
@@ -997,7 +993,7 @@ class MachineLearningMethod:
         return np.concatenate(target_point_rep)
 
 
-class ObjectiveSettings(BaseSettings):
+class ObjectiveSettings(BaseModel):
     # Objective method to use (lof, clustering).
     objective_method: str
     # Cluster resampling algorithm to use (simplified, complex).
@@ -1042,6 +1038,8 @@ class ObjectiveSettings(BaseSettings):
     percentage: Optional[int] = 10
     # LOF function to use
     lof_function: Optional[str] = 'scikit-learn'
+    # Number of cores to use for scikit-learn
+    n_jobs: Optional[int] = None
 
     @classmethod
     def from_westpa_config(cls) -> "ObjectiveSettings":
@@ -1222,7 +1220,7 @@ class Objective:
 
         return clf.negative_outlier_factor_
 
-    def lof_function_faiss(self, all_z: np.ndarray) -> np.ndarray:
+    def lof_function_faiss(self, all_z: np.ndarray, n_jobs: int) -> np.ndarray:
         # Time the LOF function
         start = time.time()
 
@@ -1459,7 +1457,7 @@ class Objective:
         return np.array(seg_labels)
 
 
-class DDWESettings(BaseSettings):
+class DDWESettings(BaseModel):
     # Output directory for the run.
     output_path: Path
     # Run machine learning; set to False for ablation.
@@ -2111,7 +2109,7 @@ class CustomDriver(DeepDriveMDDriver):
                 self.objective.save_latent_context(all_labels, all_outliers)
             else:
                 # Run LOF on the full history of embeddings to assure coverage over past states
-                all_outliers = self.objective.lof_function(all_z)
+                all_outliers = self.objective.lof_function(all_z, n_jobs=self.objective.cfg.n_jobs)
 
                     # Plot the latent space
                 if self.niter % self.cfg.plot_interval == 0:
